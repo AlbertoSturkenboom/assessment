@@ -1,13 +1,16 @@
 using System.Collections.Concurrent;
 using System.Text.Json.Serialization;
 using Core;
+using Worker;
 
 var builder = WebApplication.CreateBuilder(args);
 
-// Shared infrastructure.
+// Shared infrastructure: queue + in-memory store as singletons (single source
+// of truth in Core), plus the worker hosted in this same process so it always
+// shares the same IJobQueue and store instances as the endpoints.
 builder.Services.AddSingleton<Greeter>();
-builder.Services.AddSingleton<IJobQueue, JobQueue>();
-builder.Services.AddSingleton<ConcurrentDictionary<Guid, BackgroundJob>>();
+builder.Services.AddJobInfrastructure();
+builder.Services.AddHostedService<MainWorker>();
 
 // Serialize JobStatus as "Pending"/"Processing"/... instead of numbers.
 builder.Services.ConfigureHttpJsonOptions(options =>
