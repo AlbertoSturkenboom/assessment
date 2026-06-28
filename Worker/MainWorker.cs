@@ -34,19 +34,17 @@ public sealed class MainWorker(
 
     private async Task ConsumeAsync(CancellationToken stoppingToken)
     {
-        while (!stoppingToken.IsCancellationRequested)
+        try
         {
-            BackgroundJob job;
-            try
+            while (!stoppingToken.IsCancellationRequested)
             {
-                job = await queue.DequeueAsync(stoppingToken);
+                var job = await queue.DequeueAsync(stoppingToken);
+                await ProcessAsync(job, stoppingToken);
             }
-            catch (OperationCanceledException)
-            {
-                break;
-            }
-
-            await ProcessAsync(job, stoppingToken);
+        }
+        catch (OperationCanceledException)
+        {
+            // Normal shutdown.
         }
     }
 
