@@ -8,19 +8,9 @@ namespace Core;
 /// </summary>
 public sealed class JobQueue : IJobQueue
 {
-    private readonly Channel<BackgroundJob> _channel;
-
-    public JobQueue()
-    {
-        // Unbounded: producers never block. The channel itself is thread-safe
-        // for multiple readers and writers.
-        var options = new UnboundedChannelOptions
-        {
-            SingleReader = false,
-            SingleWriter = false
-        };
-        _channel = Channel.CreateUnbounded<BackgroundJob>(options);
-    }
+    // Unbounded: producers never block. Defaults already allow multiple
+    // concurrent readers and writers.
+    private readonly Channel<BackgroundJob> _channel = Channel.CreateUnbounded<BackgroundJob>();
 
     public ValueTask EnqueueAsync(BackgroundJob job, CancellationToken cancellationToken = default)
     {
@@ -28,8 +18,6 @@ public sealed class JobQueue : IJobQueue
         return _channel.Writer.WriteAsync(job, cancellationToken);
     }
 
-    public ValueTask<BackgroundJob> DequeueAsync(CancellationToken cancellationToken = default)
-    {
-        return _channel.Reader.ReadAsync(cancellationToken);
-    }
+    public ValueTask<BackgroundJob> DequeueAsync(CancellationToken cancellationToken = default) =>
+        _channel.Reader.ReadAsync(cancellationToken);
 }
