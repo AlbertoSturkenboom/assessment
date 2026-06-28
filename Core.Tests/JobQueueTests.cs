@@ -1,6 +1,4 @@
 using System.Collections.Concurrent;
-using Core;
-using Xunit;
 
 namespace Core.Tests;
 

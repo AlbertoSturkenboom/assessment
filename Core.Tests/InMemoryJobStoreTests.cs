@@ -1,6 +1,3 @@
-using Core;
-using Xunit;
-
 namespace Core.Tests;
 
 public class InMemoryJobStoreTests

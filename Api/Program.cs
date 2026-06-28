@@ -12,10 +12,8 @@ builder.Services.AddJobInfrastructure();
 builder.Services.AddHostedService<MainWorker>();
 
 // Serialize JobStatus as "Pending"/"Processing"/... instead of numbers.
-builder.Services.ConfigureHttpJsonOptions(options =>
-{
-    options.SerializerOptions.Converters.Add(new JsonStringEnumConverter());
-});
+builder.Services.ConfigureHttpJsonOptions(
+    options => options.SerializerOptions.Converters.Add(new JsonStringEnumConverter()));
 
 var app = builder.Build();
 

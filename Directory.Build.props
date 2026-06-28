@@ -1,0 +1,14 @@
+<Project>
+
+  <!-- Apply to every project in the solution. -->
+  <PropertyGroup>
+    <!-- Run the IDE/code-style analyzers during build so the build enforces
+         the same rules Rider reads from .editorconfig. -->
+    <EnforceCodeStyleInBuild>true</EnforceCodeStyleInBuild>
+    <!-- Required for IDE0005 (remove unnecessary usings) to run on build. -->
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <!-- ...without forcing XML doc comments on every public member. -->
+    <NoWarn>$(NoWarn);CS1591</NoWarn>
+  </PropertyGroup>
+
+</Project>
