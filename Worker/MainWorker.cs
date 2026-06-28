@@ -49,13 +49,14 @@ public class MainWorker : BackgroundService
         try
         {
             job.Status = JobStatus.Processing;
+            _store[job.Id] = job;
             _logger.LogInformation("Processing job {JobId} ({Title})", job.Id, job.Title);
 
-            // Simulate work.
-            await Task.Delay(TimeSpan.FromMilliseconds(500), stoppingToken);
+            // Simulate doing work for 3 seconds.
+            await Task.Delay(TimeSpan.FromSeconds(3), stoppingToken);
 
             job.Status = JobStatus.Completed;
-            _logger.LogInformation("Completed job {JobId}", job.Id);
+            _logger.LogInformation("Completed job {JobId} ({Title})", job.Id, job.Title);
         }
         catch (OperationCanceledException)
         {
