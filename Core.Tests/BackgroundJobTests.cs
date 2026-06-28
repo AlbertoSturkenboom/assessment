@@ -41,6 +41,30 @@ public class BackgroundJobTests
     }
 
     [Fact]
+    public void MarkCompleted_ClearsAStaleErrorMessage()
+    {
+        var failed = new BackgroundJob { Title = "build" }.MarkFailed("boom");
+
+        var completed = failed.MarkCompleted("done");
+
+        Assert.Equal(JobStatus.Completed, completed.Status);
+        Assert.Equal("done", completed.Result);
+        Assert.Null(completed.ErrorMessage);
+    }
+
+    [Fact]
+    public void MarkFailed_ClearsAStaleResult()
+    {
+        var completed = new BackgroundJob { Title = "build" }.MarkCompleted("done");
+
+        var failed = completed.MarkFailed("boom");
+
+        Assert.Equal(JobStatus.Failed, failed.Status);
+        Assert.Equal("boom", failed.ErrorMessage);
+        Assert.Null(failed.Result);
+    }
+
+    [Fact]
     public void Transitions_DoNotMutateTheOriginal()
     {
         var job = new BackgroundJob { Title = "build" };

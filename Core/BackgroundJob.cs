@@ -42,7 +42,8 @@ public record BackgroundJob
         {
             Status = JobStatus.Completed,
             CompletedAt = DateTime.UtcNow,
-            Result = result
+            Result = result,
+            ErrorMessage = null
         };
 
     /// <summary>Returns a failed snapshot with its error and completion time.</summary>
@@ -51,6 +52,7 @@ public record BackgroundJob
         {
             Status = JobStatus.Failed,
             CompletedAt = DateTime.UtcNow,
-            ErrorMessage = error
+            ErrorMessage = error,
+            Result = null
         };
 }
