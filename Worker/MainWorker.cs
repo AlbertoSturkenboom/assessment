@@ -4,28 +4,45 @@ namespace Worker;
 
 /// <summary>
 /// Consumes jobs from the shared <see cref="IJobQueue"/> and updates their
-/// status in the shared <see cref="IJobStore"/>.
+/// status in the shared <see cref="IJobStore"/>. Runs several consumer loops
+/// so jobs can be processed in parallel.
 /// </summary>
 public class MainWorker : BackgroundService
 {
     private readonly ILogger<MainWorker> _logger;
     private readonly IJobQueue _queue;
     private readonly IJobStore _store;
+    private readonly int _maxConcurrency;
 
     public MainWorker(
         ILogger<MainWorker> logger,
         IJobQueue queue,
-        IJobStore store)
+        IJobStore store,
+        IConfiguration configuration)
     {
         _logger = logger;
         _queue = queue;
         _store = store;
+        _maxConcurrency = Math.Max(1, configuration.GetValue("Worker:MaxConcurrency", 4));
     }
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
-        _logger.LogInformation("Worker started, waiting for jobs...");
+        _logger.LogInformation(
+            "Worker started with concurrency {Concurrency}, waiting for jobs...",
+            _maxConcurrency);
 
+        // Multiple consumer loops read from the same channel concurrently
+        // (the channel allows multiple readers), so up to _maxConcurrency jobs
+        // run in parallel.
+        var consumers = Enumerable.Range(0, _maxConcurrency)
+            .Select(_ => ConsumeAsync(stoppingToken));
+
+        await Task.WhenAll(consumers);
+    }
+
+    private async Task ConsumeAsync(CancellationToken stoppingToken)
+    {
         while (!stoppingToken.IsCancellationRequested)
         {
             BackgroundJob job;
@@ -59,8 +76,8 @@ public class MainWorker : BackgroundService
         }
         catch (OperationCanceledException)
         {
-            // Shutting down mid-job; leave it as Processing.
-            throw;
+            // Shutting down mid-job; leave it as Processing and stop.
+            return;
         }
         catch (Exception ex)
         {
