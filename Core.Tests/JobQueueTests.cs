@@ -1,8 +1,4 @@
-using System;
 using System.Collections.Concurrent;
-using System.Linq;
-using System.Threading;
-using System.Threading.Tasks;
 using Core;
 using Xunit;
 
@@ -34,8 +30,9 @@ public class JobQueueTests
         var second = await _queue.DequeueAsync();
         var third = await _queue.DequeueAsync();
 
-        Assert.Equal(new[] { "a", "b", "c" },
-            new[] { first.Title, second.Title, third.Title });
+        Assert.Equal("a", first.Title);
+        Assert.Equal("b", second.Title);
+        Assert.Equal("c", third.Title);
     }
 
     [Fact]

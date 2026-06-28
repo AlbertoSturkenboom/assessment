@@ -7,24 +7,14 @@ namespace Worker;
 /// status in the shared <see cref="IJobStore"/>. Runs several consumer loops
 /// so jobs can be processed in parallel.
 /// </summary>
-public class MainWorker : BackgroundService
+public sealed class MainWorker(
+    ILogger<MainWorker> logger,
+    IJobQueue queue,
+    IJobStore store,
+    IConfiguration configuration) : BackgroundService
 {
-    private readonly ILogger<MainWorker> _logger;
-    private readonly IJobQueue _queue;
-    private readonly IJobStore _store;
-    private readonly int _maxConcurrency;
-
-    public MainWorker(
-        ILogger<MainWorker> logger,
-        IJobQueue queue,
-        IJobStore store,
-        IConfiguration configuration)
-    {
-        _logger = logger;
-        _queue = queue;
-        _store = store;
-        _maxConcurrency = Math.Max(1, configuration.GetValue("Worker:MaxConcurrency", 4));
-    }
+    private readonly int _maxConcurrency =
+        Math.Max(1, configuration.GetValue("Worker:MaxConcurrency", 4));
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
@@ -32,7 +22,7 @@ public class MainWorker : BackgroundService
         // runs before the first real await, regardless of future changes here.
         await Task.Yield();
 
-        _logger.LogInformation(
+        logger.LogInformation(
             "Worker started with concurrency {Concurrency}, waiting for jobs...",
             _maxConcurrency);
 
@@ -49,7 +39,7 @@ public class MainWorker : BackgroundService
             BackgroundJob job;
             try
             {
-                job = await _queue.DequeueAsync(stoppingToken);
+                job = await queue.DequeueAsync(stoppingToken);
             }
             catch (OperationCanceledException)
             {
@@ -64,13 +54,13 @@ public class MainWorker : BackgroundService
     {
         try
         {
-            _store.Save(job.MarkProcessing());
-            _logger.LogInformation("Processing job {JobId} ({Title})", job.Id, job.Title);
+            store.Save(job.MarkProcessing());
+            logger.LogInformation("Processing job {JobId} ({Title})", job.Id, job.Title);
 
             var result = await PerformWorkAsync(job, stoppingToken);
 
-            _store.Save(job.MarkCompleted(result));
-            _logger.LogInformation("Completed job {JobId} ({Title})", job.Id, job.Title);
+            store.Save(job.MarkCompleted(result));
+            logger.LogInformation("Completed job {JobId} ({Title})", job.Id, job.Title);
         }
         catch (OperationCanceledException)
         {
@@ -78,8 +68,8 @@ public class MainWorker : BackgroundService
         }
         catch (Exception ex)
         {
-            _store.Save(job.MarkFailed(ex.Message));
-            _logger.LogError(ex, "Job {JobId} failed", job.Id);
+            store.Save(job.MarkFailed(ex.Message));
+            logger.LogError(ex, "Job {JobId} failed", job.Id);
         }
     }
 
