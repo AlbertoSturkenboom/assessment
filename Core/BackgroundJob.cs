@@ -4,28 +4,31 @@ namespace Core;
 /// A unit of work that can be queued and processed by the Worker.
 /// </summary>
 /// <remarks>
-/// A job instance is shared by reference between the producer (Api) and the
-/// consumer (Worker). Only <see cref="Status"/> changes after the job has been
-/// published to the queue/store, so it is read and written with volatile
-/// semantics to guarantee the Api always observes the latest value written by
-/// the Worker. The other properties are set once before publication and are not
-/// mutated afterwards.
+/// Immutable: state transitions produce a new snapshot (via <c>with</c>) that
+/// replaces the previous one in the store. Because each snapshot is fully
+/// constructed before it is published and the store swaps the reference
+/// atomically, a reader (the Api) always observes an internally consistent set
+/// of fields — e.g. it can never see <see cref="JobStatus.Completed"/> without
+/// the matching <see cref="CompletedAt"/>/<see cref="Result"/>.
 /// </remarks>
-public class BackgroundJob
+public record BackgroundJob
 {
-    private int _status = (int)JobStatus.Pending;
+    public Guid Id { get; init; } = Guid.NewGuid();
 
-    public Guid Id { get; set; } = Guid.NewGuid();
+    public string Title { get; init; } = string.Empty;
 
-    public string Title { get; set; } = string.Empty;
+    public string Payload { get; init; } = string.Empty;
 
-    public string Payload { get; set; } = string.Empty;
+    public JobStatus Status { get; init; } = JobStatus.Pending;
 
-    public JobStatus Status
-    {
-        get => (JobStatus)Volatile.Read(ref _status);
-        set => Volatile.Write(ref _status, (int)value);
-    }
+    public DateTime CreatedAt { get; init; } = DateTime.UtcNow;
 
-    public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+    /// <summary>Set together with a terminal status (Completed or Failed).</summary>
+    public DateTime? CompletedAt { get; init; }
+
+    /// <summary>Result payload, set when the job completes successfully.</summary>
+    public string? Result { get; init; }
+
+    /// <summary>Error description, set when the job fails.</summary>
+    public string? ErrorMessage { get; init; }
 }

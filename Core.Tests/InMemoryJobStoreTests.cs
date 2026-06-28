@@ -11,8 +11,8 @@ public class InMemoryJobStoreTests
     [Fact]
     public async Task ConcurrentReadsAndWrites_StayConsistent()
     {
-        // Mimics the Api (readers) and the Worker (writers mutating status)
-        // hitting the same store and the same job instances simultaneously.
+        // Mimics the Api (readers) and the Worker (writers saving new snapshots)
+        // hitting the same store and the same job ids simultaneously.
         var store = new InMemoryJobStore();
         var jobs = Enumerable.Range(0, 50).Select(_ => new BackgroundJob()).ToArray();
         foreach (var job in jobs)
@@ -22,12 +22,18 @@ public class InMemoryJobStoreTests
 
         var writers = jobs.Select(job => Task.Run(() =>
         {
+            var current = job;
             for (var i = 0; i < 500; i++)
             {
-                job.Status = JobStatus.Processing;
-                store.Save(job);
-                job.Status = JobStatus.Completed;
-                store.Save(job);
+                current = current with { Status = JobStatus.Processing };
+                store.Save(current);
+                current = current with
+                {
+                    Status = JobStatus.Completed,
+                    CompletedAt = DateTime.UtcNow,
+                    Result = "ok"
+                };
+                store.Save(current);
             }
         }));
 
@@ -39,9 +45,16 @@ public class InMemoryJobStoreTests
                 {
                     if (store.TryGet(job.Id, out var found))
                     {
-                        // Reading status concurrently with writers must not throw
-                        // and must always be a defined enum value.
+                        // Reading concurrently with writers must not throw, must
+                        // be a defined enum value, and must be internally
+                        // consistent: a Completed snapshot always carries its
+                        // CompletedAt/Result (never a half-applied update).
                         Assert.True(Enum.IsDefined(found.Status));
+                        if (found.Status == JobStatus.Completed)
+                        {
+                            Assert.NotNull(found.CompletedAt);
+                            Assert.Equal("ok", found.Result);
+                        }
                     }
                 }
             }
@@ -54,6 +67,7 @@ public class InMemoryJobStoreTests
             Assert.True(store.TryGet(job.Id, out var found));
             Assert.Equal(job.Id, found.Id);
             Assert.Equal(JobStatus.Completed, found.Status);
+            Assert.NotNull(found.CompletedAt);
         }
     }
 
@@ -88,11 +102,11 @@ public class InMemoryJobStoreTests
         var job = new BackgroundJob { Title = "build" };
         store.Save(job);
 
-        job.Status = JobStatus.Completed;
-        store.Save(job);
+        var completed = job with { Status = JobStatus.Completed };
+        store.Save(completed);
 
         Assert.True(store.TryGet(job.Id, out var retrieved));
-        Assert.Equal(JobStatus.Completed, retrieved!.Status);
+        Assert.Equal(JobStatus.Completed, retrieved.Status);
     }
 
     [Fact]

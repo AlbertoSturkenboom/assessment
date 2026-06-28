@@ -68,30 +68,39 @@ public class MainWorker : BackgroundService
     {
         try
         {
-            job.Status = JobStatus.Processing;
+            // Each transition saves a new immutable snapshot, so a reader never
+            // sees a half-updated job.
+            job = job with { Status = JobStatus.Processing };
             _store.Save(job);
             _logger.LogInformation("Processing job {JobId} ({Title})", job.Id, job.Title);
 
             // Simulate doing work for 3 seconds.
             await Task.Delay(TimeSpan.FromSeconds(3), stoppingToken);
 
-            job.Status = JobStatus.Completed;
+            job = job with
+            {
+                Status = JobStatus.Completed,
+                CompletedAt = DateTime.UtcNow,
+                Result = $"Processed '{job.Title}'"
+            };
+            _store.Save(job);
             _logger.LogInformation("Completed job {JobId} ({Title})", job.Id, job.Title);
         }
         catch (OperationCanceledException)
         {
-            // Shutting down mid-job; leave it as Processing and stop.
+            // Shutting down mid-job; leave the last saved (Processing) snapshot.
             return;
         }
         catch (Exception ex)
         {
-            job.Status = JobStatus.Failed;
+            var failed = job with
+            {
+                Status = JobStatus.Failed,
+                CompletedAt = DateTime.UtcNow,
+                ErrorMessage = ex.Message
+            };
+            _store.Save(failed);
             _logger.LogError(ex, "Job {JobId} failed", job.Id);
-        }
-        finally
-        {
-            // Keep the shared store in sync with the final status.
-            _store.Save(job);
         }
     }
 }
