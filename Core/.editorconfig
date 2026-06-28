@@ -1,0 +1,6 @@
+# Library-specific analyzer rules for the Core project.
+# CA2007: await expressions should specify ConfigureAwait(false) in library
+# code, so awaits never capture a caller's SynchronizationContext. Core has no
+# awaits today; this guards any that get added later.
+[*.cs]
+dotnet_diagnostic.CA2007.severity = warning
