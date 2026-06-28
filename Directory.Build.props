@@ -9,6 +9,9 @@
     <GenerateDocumentationFile>true</GenerateDocumentationFile>
     <!-- ...without forcing XML doc comments on every public member. -->
     <NoWarn>$(NoWarn);CS1591</NoWarn>
+    <!-- Run on a newer major runtime (e.g. .NET 10) when the exact net8.0
+         runtime isn't installed. An exact match is still preferred when present. -->
+    <RollForward>Major</RollForward>
   </PropertyGroup>
 
 </Project>
