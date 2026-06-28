@@ -28,6 +28,10 @@ public class MainWorker : BackgroundService
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
+        // Yield immediately so host startup is never blocked by anything that
+        // runs before the first real await, regardless of future changes here.
+        await Task.Yield();
+
         _logger.LogInformation(
             "Worker started with concurrency {Concurrency}, waiting for jobs...",
             _maxConcurrency);
