@@ -1,14 +1,12 @@
-using System.Collections.Concurrent;
 using System.Text.Json.Serialization;
 using Core;
 using Worker;
 
 var builder = WebApplication.CreateBuilder(args);
 
-// Shared infrastructure: queue + in-memory store as singletons (single source
-// of truth in Core), plus the worker hosted in this same process so it always
-// shares the same IJobQueue and store instances as the endpoints.
-builder.Services.AddSingleton<Greeter>();
+// Shared infrastructure: queue + store as singletons (single source of truth
+// in Core), plus the worker hosted in this same process so it always shares
+// the same IJobQueue and IJobStore instances as the endpoints.
 builder.Services.AddJobInfrastructure();
 builder.Services.AddHostedService<MainWorker>();
 
@@ -20,14 +18,11 @@ builder.Services.ConfigureHttpJsonOptions(options =>
 
 var app = builder.Build();
 
-app.MapGet("/", (Greeter greeter) => greeter.Greet(null));
-app.MapGet("/hello/{name}", (string name, Greeter greeter) => greeter.Greet(name));
-
 // Enqueue a new job and store it so its status can be queried later.
 app.MapPost("/api/jobs", async (
     CreateJobRequest request,
     IJobQueue queue,
-    ConcurrentDictionary<Guid, BackgroundJob> store) =>
+    IJobStore store) =>
 {
     if (string.IsNullOrWhiteSpace(request.Title))
     {
@@ -40,7 +35,7 @@ app.MapPost("/api/jobs", async (
         Payload = request.Payload ?? string.Empty
     };
 
-    store[job.Id] = job;
+    store.Save(job);
     await queue.EnqueueAsync(job);
 
     // 202 Accepted: the job is queued, processing happens asynchronously.
@@ -48,12 +43,10 @@ app.MapPost("/api/jobs", async (
 });
 
 // Return the current state of a previously submitted job.
-app.MapGet("/api/jobs/{id:guid}", (
-    Guid id,
-    ConcurrentDictionary<Guid, BackgroundJob> store) =>
-        store.TryGetValue(id, out var job)
-            ? Results.Ok(job)
-            : Results.NotFound());
+app.MapGet("/api/jobs/{id:guid}", (Guid id, IJobStore store) =>
+    store.TryGet(id, out var job)
+        ? Results.Ok(job)
+        : Results.NotFound());
 
 app.Run();
 

@@ -1,22 +1,21 @@
-using System.Collections.Concurrent;
 using Core;
 
 namespace Worker;
 
 /// <summary>
 /// Consumes jobs from the shared <see cref="IJobQueue"/> and updates their
-/// status in the shared in-memory store.
+/// status in the shared <see cref="IJobStore"/>.
 /// </summary>
 public class MainWorker : BackgroundService
 {
     private readonly ILogger<MainWorker> _logger;
     private readonly IJobQueue _queue;
-    private readonly ConcurrentDictionary<Guid, BackgroundJob> _store;
+    private readonly IJobStore _store;
 
     public MainWorker(
         ILogger<MainWorker> logger,
         IJobQueue queue,
-        ConcurrentDictionary<Guid, BackgroundJob> store)
+        IJobStore store)
     {
         _logger = logger;
         _queue = queue;
@@ -49,7 +48,7 @@ public class MainWorker : BackgroundService
         try
         {
             job.Status = JobStatus.Processing;
-            _store[job.Id] = job;
+            _store.Save(job);
             _logger.LogInformation("Processing job {JobId} ({Title})", job.Id, job.Title);
 
             // Simulate doing work for 3 seconds.
@@ -70,9 +69,8 @@ public class MainWorker : BackgroundService
         }
         finally
         {
-            // Keep the shared store in sync (the job is the same reference the
-            // Api stored, but this is explicit and safe either way).
-            _store[job.Id] = job;
+            // Keep the shared store in sync with the final status.
+            _store.Save(job);
         }
     }
 }

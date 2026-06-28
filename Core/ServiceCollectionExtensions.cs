@@ -1,4 +1,3 @@
-using System.Collections.Concurrent;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace Core;
@@ -10,14 +9,14 @@ namespace Core;
 public static class ServiceCollectionExtensions
 {
     /// <summary>
-    /// Registers the shared job queue and the in-memory job store as singletons.
+    /// Registers the shared job queue and the job store as singletons.
     /// Both must be singletons so producers (Api) and the consumer (Worker)
     /// running in the same process share one queue and one store.
     /// </summary>
     public static IServiceCollection AddJobInfrastructure(this IServiceCollection services)
     {
         services.AddSingleton<IJobQueue, JobQueue>();
-        services.AddSingleton<ConcurrentDictionary<Guid, BackgroundJob>>();
+        services.AddSingleton<IJobStore, InMemoryJobStore>();
         return services;
     }
 }
