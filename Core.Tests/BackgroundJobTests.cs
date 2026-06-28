@@ -7,6 +7,55 @@ namespace Core.Tests;
 public class BackgroundJobTests
 {
     [Fact]
+    public void MarkProcessing_SetsOnlyStatus()
+    {
+        var job = new BackgroundJob { Title = "build" };
+
+        var processing = job.MarkProcessing();
+
+        Assert.Equal(JobStatus.Processing, processing.Status);
+        Assert.Null(processing.CompletedAt);
+        Assert.Null(processing.Result);
+    }
+
+    [Fact]
+    public void MarkCompleted_SetsStatusResultAndCompletedAt()
+    {
+        var job = new BackgroundJob { Title = "build" };
+
+        var completed = job.MarkCompleted("done");
+
+        Assert.Equal(JobStatus.Completed, completed.Status);
+        Assert.Equal("done", completed.Result);
+        Assert.NotNull(completed.CompletedAt);
+        Assert.Null(completed.ErrorMessage);
+    }
+
+    [Fact]
+    public void MarkFailed_SetsStatusErrorAndCompletedAt()
+    {
+        var job = new BackgroundJob { Title = "build" };
+
+        var failed = job.MarkFailed("boom");
+
+        Assert.Equal(JobStatus.Failed, failed.Status);
+        Assert.Equal("boom", failed.ErrorMessage);
+        Assert.NotNull(failed.CompletedAt);
+        Assert.Null(failed.Result);
+    }
+
+    [Fact]
+    public void Transitions_DoNotMutateTheOriginal()
+    {
+        var job = new BackgroundJob { Title = "build" };
+
+        job.MarkCompleted("done");
+
+        Assert.Equal(JobStatus.Pending, job.Status);
+        Assert.Null(job.CompletedAt);
+    }
+
+    [Fact]
     public void NewJob_HasNonEmptyId()
     {
         var job = new BackgroundJob();

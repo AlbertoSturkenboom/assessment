@@ -1,4 +1,5 @@
 using System.Text.Json.Serialization;
+using Api;
 using Core;
 using Worker;
 
@@ -18,36 +19,6 @@ builder.Services.ConfigureHttpJsonOptions(options =>
 
 var app = builder.Build();
 
-// Enqueue a new job and store it so its status can be queried later.
-app.MapPost("/api/jobs", async (
-    CreateJobRequest request,
-    IJobQueue queue,
-    IJobStore store) =>
-{
-    if (string.IsNullOrWhiteSpace(request.Title))
-    {
-        return Results.BadRequest("Title is required.");
-    }
-
-    var job = new BackgroundJob
-    {
-        Title = request.Title,
-        Payload = request.Payload ?? string.Empty
-    };
-
-    store.Save(job);
-    await queue.EnqueueAsync(job);
-
-    // 202 Accepted: the job is queued, processing happens asynchronously.
-    return Results.Accepted($"/api/jobs/{job.Id}", job);
-});
-
-// Return the current state of a previously submitted job.
-app.MapGet("/api/jobs/{id:guid}", (Guid id, IJobStore store) =>
-    store.TryGet(id, out var job)
-        ? Results.Ok(job)
-        : Results.NotFound());
+app.MapJobEndpoints();
 
 app.Run();
-
-public record CreateJobRequest(string Title, string? Payload);

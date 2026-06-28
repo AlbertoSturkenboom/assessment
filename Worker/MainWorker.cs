@@ -36,9 +36,6 @@ public class MainWorker : BackgroundService
             "Worker started with concurrency {Concurrency}, waiting for jobs...",
             _maxConcurrency);
 
-        // Multiple consumer loops read from the same channel concurrently
-        // (the channel allows multiple readers), so up to _maxConcurrency jobs
-        // run in parallel.
         var consumers = Enumerable.Range(0, _maxConcurrency)
             .Select(_ => ConsumeAsync(stoppingToken));
 
@@ -56,7 +53,6 @@ public class MainWorker : BackgroundService
             }
             catch (OperationCanceledException)
             {
-                // Normal shutdown.
                 break;
             }
 
@@ -68,39 +64,29 @@ public class MainWorker : BackgroundService
     {
         try
         {
-            // Each transition saves a new immutable snapshot, so a reader never
-            // sees a half-updated job.
-            job = job with { Status = JobStatus.Processing };
-            _store.Save(job);
+            _store.Save(job.MarkProcessing());
             _logger.LogInformation("Processing job {JobId} ({Title})", job.Id, job.Title);
 
-            // Simulate doing work for 3 seconds.
-            await Task.Delay(TimeSpan.FromSeconds(3), stoppingToken);
+            var result = await PerformWorkAsync(job, stoppingToken);
 
-            job = job with
-            {
-                Status = JobStatus.Completed,
-                CompletedAt = DateTime.UtcNow,
-                Result = $"Processed '{job.Title}'"
-            };
-            _store.Save(job);
+            _store.Save(job.MarkCompleted(result));
             _logger.LogInformation("Completed job {JobId} ({Title})", job.Id, job.Title);
         }
         catch (OperationCanceledException)
         {
             // Shutting down mid-job; leave the last saved (Processing) snapshot.
-            return;
         }
         catch (Exception ex)
         {
-            var failed = job with
-            {
-                Status = JobStatus.Failed,
-                CompletedAt = DateTime.UtcNow,
-                ErrorMessage = ex.Message
-            };
-            _store.Save(failed);
+            _store.Save(job.MarkFailed(ex.Message));
             _logger.LogError(ex, "Job {JobId} failed", job.Id);
         }
+    }
+
+    /// <summary>The actual unit of work; the obvious place to plug in real logic.</summary>
+    private static async Task<string> PerformWorkAsync(BackgroundJob job, CancellationToken stoppingToken)
+    {
+        await Task.Delay(TimeSpan.FromSeconds(3), stoppingToken);
+        return $"Processed '{job.Title}'";
     }
 }

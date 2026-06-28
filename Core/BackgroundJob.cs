@@ -31,4 +31,26 @@ public record BackgroundJob
 
     /// <summary>Error description, set when the job fails.</summary>
     public string? ErrorMessage { get; init; }
+
+    /// <summary>Returns a snapshot moved to <see cref="JobStatus.Processing"/>.</summary>
+    public BackgroundJob MarkProcessing() =>
+        this with { Status = JobStatus.Processing };
+
+    /// <summary>Returns a completed snapshot with its result and completion time.</summary>
+    public BackgroundJob MarkCompleted(string result) =>
+        this with
+        {
+            Status = JobStatus.Completed,
+            CompletedAt = DateTime.UtcNow,
+            Result = result
+        };
+
+    /// <summary>Returns a failed snapshot with its error and completion time.</summary>
+    public BackgroundJob MarkFailed(string error) =>
+        this with
+        {
+            Status = JobStatus.Failed,
+            CompletedAt = DateTime.UtcNow,
+            ErrorMessage = error
+        };
 }
